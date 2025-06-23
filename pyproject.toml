@@ -1,0 +1,39 @@
+[project]
+name = "fosho"
+version = "0.1.0"
+description = "Data Signing & Quality - Offline data integrity with CRC32 file hashing and MD5 schema hashing"
+readme = "readme.md"
+authors = [
+    { name = "Joe Hakim", email = "joebhakim@gmail.com" }
+]
+requires-python = ">=3.9"
+dependencies = [
+    "pandas>=2.2",
+    "pandera[io]>=0.18",
+    "typer[all]",
+    "pyarrow",
+    "python-dateutil",
+    "PyYAML",
+    "black",
+    "frictionless"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "ruff", 
+    "black",
+    "pytest-socket"
+]
+
+[project.scripts]
+fosho = "fosho:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.1",
+]

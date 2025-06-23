@@ -1,0 +1,29 @@
+{
+  "datasets": {
+    "examples/data/complex_metrics.csv": {
+      "crc32": "34e89325",
+      "schema_md5": "a9d3fc372a2e0f46c75f6764a39e9587",
+      "signed": false,
+      "signed_at": null
+    },
+    "examples/data/nested_json.csv": {
+      "crc32": "65943087",
+      "schema_md5": "f557787112e1abe726879a6234aff80c",
+      "signed": false,
+      "signed_at": null
+    },
+    "examples/data/static_notes.csv": {
+      "crc32": "c1c505d5",
+      "schema_md5": "64adf2a2e6c9edb1cd776c328bab49e0",
+      "signed": false,
+      "signed_at": null
+    },
+    "examples/data/vitals_multiindex.csv": {
+      "crc32": "66cf0924",
+      "schema_md5": "7729b1e05f2409a7a7310cde9bb76c01",
+      "signed": false,
+      "signed_at": null
+    }
+  },
+  "manifest_md5": "5bfaecb3396a96667be7f5c3f380c641"
+}
