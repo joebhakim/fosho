@@ -4,22 +4,31 @@
 
 Stop wondering if your downstream scripts are using the data you think they are. fosho gives you confidence that your data hasn't changed under your feet.
 
-## Quick Start (Copy-Paste Ready)
+## Zombie-Proof Steps (Copy-Paste Ready)
 
-### Step 1: Put your messy CSV somewhere
+**Scenario:** You have `downstream_script.py` that keeps breaking because your data changes. You want it to fail fast with clear errors instead of producing wrong results.
+
+### Step 1: You already have data + a script that breaks
 ```bash
-# You already have data somewhere, like data/my_messy_data.csv
+# Your current situation:
+# - data/my_data.csv (keeps changing)  
+# - downstream_script.py (breaks silently when data changes)
 ```
 
-### Step 2: Generate a simple schema
+### Step 2: Generate schema (once)
 ```bash
 uv run python -c "
 from src.fosho.scaffold import scaffold_dataset_schema
-schema, schema_file = scaffold_dataset_schema('data/my_messy_data.csv')
+schema, schema_file = scaffold_dataset_schema('data/my_data.csv')
 print(f'✅ Generated: {schema_file}')
 "
 ```
-This creates `schemas/my_messy_data_schema.py` with basic validation:
+
+### Step 3: Look at schema, edit if needed
+```bash
+cat schemas/my_data_schema.py
+```
+You'll see something like:
 ```python
 schema = pa.DataFrameSchema({
     "id": pa.Column(int),
@@ -27,27 +36,29 @@ schema = pa.DataFrameSchema({
     "score": pa.Column(float, nullable=True),
 })
 ```
+Edit this file if you want stricter validation (ranges, required values, etc.).
 
-### Step 3: Look at the schema (always do this!)
-```bash
-cat schemas/my_messy_data_schema.py
-```
-The schema is minimal - just column names and types. Edit it if you want more validation rules.
-
-### Step 4: Use validated data in your scripts
+### Step 4: Replace your pandas.read_csv() calls
+**Before (dangerous):**
 ```python
 import pandas as pd
-import sys
-sys.path.append('schemas')
-from my_messy_data_schema import validate_dataframe
-
-# Load and validate your data
-df = pd.read_csv('data/my_messy_data.csv')
-validated_df = validate_dataframe(df)  # 🚨 Fails if schema doesn't match
-
-# Now you can trust this data structure
-print(validated_df['column_name'])
+df = pd.read_csv('data/my_data.csv')  # Silent failures
 ```
+
+**After (safe):**
+```python
+import pandas as pd
+import sys; sys.path.append('schemas')
+from my_data_schema import validate_dataframe
+
+df = pd.read_csv('data/my_data.csv')
+validated_df = validate_dataframe(df)  # 🚨 CRASHES if data changed
+```
+
+### Step 5: Run your script
+- ✅ **If data matches schema:** Script runs normally
+- 🚨 **If data changed:** Script crashes with clear error message
+- 🎯 **No more silent failures:** You immediately know when data structure changes
 
 ## What This Solves
 
@@ -62,34 +73,52 @@ print(validated_df['column_name'])
 3. **Signing workflow** - Explicit approval step prevents accidents
 4. **Fail-fast** - Scripts error immediately if using stale/changed data
 
-## Example Workflow
+## Concrete Example
 
+**Your messy situation:**
 ```bash
-# Initial setup
-mkdir data
-echo "id,name
-1,alice
-2,bob" > data/example.csv
+# You have this data that keeps changing
+cat data/sales.csv
+# id,product,revenue
+# 1,widget,100.50
+# 2,gadget,75.25
 
-# Generate schema
+# And this script that breaks when data structure changes
+cat analyze_sales.py
+# import pandas as pd
+# df = pd.read_csv('data/sales.csv')
+# print(df['revenue'].mean())  # Breaks if 'revenue' column disappears
+```
+
+**The fosho solution:**
+```bash
+# 1. Generate schema once
 uv run python -c "
 from src.fosho.scaffold import scaffold_dataset_schema
-schema, schema_file = scaffold_dataset_schema('data/example.csv')
+schema, schema_file = scaffold_dataset_schema('data/sales.csv')
 print(f'Generated: {schema_file}')
 "
 
-# Use in Python
-python -c "
-import pandas as pd
-import sys; sys.path.append('schemas')
-from example_schema import validate_dataframe
+# 2. Check what it generated
+cat schemas/sales_schema.py
+# schema = pa.DataFrameSchema({
+#     "id": pa.Column(int),
+#     "product": pa.Column(str), 
+#     "revenue": pa.Column(float),
+# })
 
-df = pd.read_csv('data/example.csv')
-validated_df = validate_dataframe(df)
-print('✅ Data is valid!')
-print(validated_df)
-"
+# 3. Update your script (2 line change)
+cat analyze_sales_safe.py
+# import pandas as pd
+# import sys; sys.path.append('schemas')
+# from sales_schema import validate_dataframe
+# 
+# df = pd.read_csv('data/sales.csv')
+# validated_df = validate_dataframe(df)  # <- This line protects you
+# print(validated_df['revenue'].mean())  # Now safe!
 ```
+
+**Result:** Your script now crashes immediately with a clear error if someone changes the data structure, instead of producing wrong results.
 
 ## When Things Change
 

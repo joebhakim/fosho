@@ -1,47 +1,87 @@
-# Downstream, we want to have something like:
+# CLI Example: Half-Asleep Data Scientist Workflow
 
+## The Problem
+You have `downstream_script.py` that works today but breaks tomorrow when your data changes. You want it to fail loudly instead of producing wrong results.
+
+## Current (Broken) Workflow
+
+```python
+# downstream_script.py - DANGEROUS VERSION
+import pandas as pd
+
+# This silently breaks when CSV structure changes
+df = pd.read_csv("data/experiment_results.csv")
+print(f"Average score: {df['score'].mean()}")  # KeyError if 'score' column disappears
 ```
 
+## Fixed Workflow with fosho
 
-# Warn here if not validated
-wrapped_df = fosho.read_csv(file="data/static_notes.csv", 
-                            schema="data_and_schemas/static_notes.yaml", 
-                            validation_artifacts="static_notes_validation_artifacts")
-
-
-wrapped_df.validate() # Error here if not validated
-
-print(wrapped_df['a'] ) # This data is as trustworthy as the validator
-
-
+### Step 1: Generate schema (once, when half-asleep)
+```bash
+# Generate basic schema from your current data
+uv run python -c "
+from src.fosho.scaffold import scaffold_dataset_schema
+schema, schema_file = scaffold_dataset_schema('data/experiment_results.csv')
+print(f'✅ Generated: {schema_file}')
+"
 ```
 
+### Step 2: Human-check the schema (always do this!)
+```bash
+cat schemas/experiment_results_schema.py
+```
+You'll see something minimal like:
+```python
+"""Auto-generated schema for experiment_results.csv."""
 
-# When you have just the data (static_notes.csv)
+import pandera.pandas as pa
 
-Step 1: Generate the schema guess:
+schema = pa.DataFrameSchema({
+    "experiment_id": pa.Column(int),
+    "condition": pa.Column(str),
+    "score": pa.Column(float),
+    "participant": pa.Column(str, nullable=True),
+})
+```
 
-`...`
+**Edit this file** if you want more validation (e.g., score must be between 0-100, conditions must be specific values, etc.).
 
-Step 2: Human-check the schema guess
+### Step 3: Update your downstream script (2-line change)
+```python
+# downstream_script.py - SAFE VERSION  
+import pandas as pd
+import sys; sys.path.append('schemas')
+from experiment_results_schema import validate_dataframe
 
+df = pd.read_csv("data/experiment_results.csv")
+validated_df = validate_dataframe(df)  # 🚨 CRASHES if structure changed
+print(f"Average score: {validated_df['score'].mean()}")  # Now safe!
+```
 
-`Open the yml file in your favorite text editor. Read it with your human eyes.`
+### Step 4: Run your script
+- ✅ **Data unchanged:** Script runs normally
+- 🚨 **Data structure changed:** Script crashes with clear error:
+  ```
+  SchemaError: column 'score' not in dataframe. 
+  Columns in dataframe: ['experiment_id', 'condition', 'rating']
+  ```
+- 🎯 **No silent failures:** You immediately know when someone changed your data
 
-Step 3a: the schema is wrong (passes pandera validation but missing something crucial)
+## When Data Changes (Intentionally)
 
-`Edit the yml to fix it manually.`
+1. **Regenerate schema:**
+   ```bash
+   uv run python -c "
+   from src.fosho.scaffold import scaffold_dataset_schema
+   schema, schema_file = scaffold_dataset_schema('data/experiment_results.csv', overwrite=True)
+   print(f'Updated: {schema_file}')
+   "
+   ```
 
-Step 3b: the schema is wrong (does not pass pandera validation)
+2. **Review changes:** Check what changed in the schema file
 
-`Note to dev: this shouldn't happen eventually? For now, Edit the yml to fix it manually.`
+3. **Test your script:** Make sure it still works with new data structure
 
-Step 3c: the schema is correct (does all the validations you need from it). Sign it!
-
-`...`
-
-This produces the validation artifacts that get invalidated when the data or schema changes. Now, 
-the above `wrapped_df.validate()` will pass.
-
-...
+## Result
+Your downstream scripts now fail fast with clear errors instead of producing wrong results when data changes. Perfect for preprocessing pipelines that keep evolving.
 
