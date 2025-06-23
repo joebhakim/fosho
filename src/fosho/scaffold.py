@@ -25,32 +25,12 @@ def detect_multiindex_columns(df: pd.DataFrame) -> bool:
 
 
 def infer_column_schema(series: pd.Series, col_name: Union[str, Tuple]) -> pa.Column:
-    """Infer Pandera column schema from pandas Series."""
+    """Infer simple Pandera column schema from pandas Series."""
     dtype = series.dtype
     nullable = bool(series.isnull().any())  # Convert numpy.bool_ to bool
 
-    # Handle different dtypes
-    if pd.api.types.is_integer_dtype(dtype):
-        # For integers, assume non-negative if all values >= 0
-        checks = []
-        if not nullable and len(series) > 0:
-            min_val = series.min()
-            if min_val >= 0:
-                checks.append(pa.Check.greater_than_or_equal_to(int(min_val)))
-        return pa.Column(dtype, nullable=nullable, checks=checks)
-
-    elif pd.api.types.is_float_dtype(dtype):
-        return pa.Column(dtype, nullable=True)  # Floats can have NaN
-
-    elif pd.api.types.is_bool_dtype(dtype):
-        return pa.Column(dtype, nullable=nullable)
-
-    elif pd.api.types.is_datetime64_any_dtype(dtype):
-        return pa.Column(dtype, nullable=nullable)
-
-    else:
-        # Default to object/string type
-        return pa.Column("object", nullable=True)
+    # Simple schema: just dtype and nullable, no complex checks
+    return pa.Column(dtype, nullable=nullable)
 
 
 def detect_index_columns(df: pd.DataFrame) -> List[str]:
@@ -59,11 +39,10 @@ def detect_index_columns(df: pd.DataFrame) -> List[str]:
 
     for col in df.columns:
         col_name = col if isinstance(col, str) else str(col)
-        # Check for unnamed columns or columns that look like default index names
+        # Only detect truly unnamed columns - be more conservative
         if (
             col_name == ""
             or col_name.startswith("Unnamed:")
-            or col_name.lower() in ["index", "id"]
         ):
             index_columns.append(col)
 
@@ -115,19 +94,20 @@ def load_dataset(file_path: Union[str, Path]) -> pd.DataFrame:
         with open(file_path, "r") as f:
             first_lines = [f.readline().strip() for _ in range(3)]
 
+        # Disable multi-header detection for now - keep it simple
         # Simple heuristic: if first two lines have similar structure, assume multi-header
-        if len(first_lines) >= 2:
-            first_commas = first_lines[0].count(",")
-            second_commas = first_lines[1].count(",")
+        # if len(first_lines) >= 2:
+        #     first_commas = first_lines[0].count(",")
+        #     second_commas = first_lines[1].count(",")
 
-            if abs(first_commas - second_commas) <= 1 and first_commas > 0:
-                # Try loading with multi-header
-                try:
-                    df = pd.read_csv(file_path, header=[0, 1])
-                    if len(df.columns.names) == 2:  # Successfully loaded multi-header
-                        return df
-                except:
-                    pass
+        #     if abs(first_commas - second_commas) <= 1 and first_commas > 0:
+        #         # Try loading with multi-header
+        #         try:
+        #             df = pd.read_csv(file_path, header=[0, 1])
+        #             if len(df.columns.names) == 2:  # Successfully loaded multi-header
+        #                 return df
+        #         except:
+        #             pass
 
         # Fall back to single header
         return pd.read_csv(file_path)
@@ -144,7 +124,7 @@ def generate_schema_file(
     file_path: Union[str, Path],
     output_dir: Union[str, Path] = "schemas",
 ) -> Path:
-    """Generate Python schema file from Pandera schema."""
+    """Generate simple Python schema file from Pandera schema."""
     file_path = Path(file_path)
     output_dir = Path(output_dir)
     output_dir.mkdir(exist_ok=True)
@@ -152,29 +132,51 @@ def generate_schema_file(
     slug = create_schema_slug(file_path)
     schema_file = output_dir / f"{slug}_schema.py"
 
-    # Generate schema code
-    schema_yaml = schema.to_yaml()
-
-    schema_code = f'''"""Auto-generated Pandera schema for {file_path.name}."""
-
-import pandera.pandas as pa
-from pandera.typing import DataFrame
-
-# Schema definition in YAML format:
-schema_yaml = """
-{schema_yaml}
-"""
-
-# Load schema from YAML
-schema = pa.io.from_yaml(schema_yaml)
-
-def validate_dataframe(df) -> DataFrame:
-    """Validate DataFrame against schema."""
-    return schema.validate(df)
-'''
+    # Generate simple Python schema content
+    lines = [
+        f'"""Auto-generated schema for {file_path.name}."""',
+        "",
+        "import pandera.pandas as pa",
+        "",
+        "schema = pa.DataFrameSchema({",
+    ]
+    
+    for col_name, col_schema in schema.columns.items():
+        # Handle column names with special characters
+        if isinstance(col_name, str) and col_name.isidentifier():
+            col_repr = f'"{col_name}"'
+        else:
+            col_repr = repr(col_name)
+        
+        # Map dtypes to simple Python types
+        dtype_name = str(col_schema.dtype)
+        if "int" in dtype_name:
+            dtype_str = "int"
+        elif "float" in dtype_name:
+            dtype_str = "float"
+        elif "object" in dtype_name or "string" in dtype_name:
+            dtype_str = "str"
+        elif "bool" in dtype_name:
+            dtype_str = "bool"
+        else:
+            dtype_str = "str"  # Default fallback
+        
+        # Simple column definition
+        if col_schema.nullable:
+            lines.append(f'    {col_repr}: pa.Column({dtype_str}, nullable=True),')
+        else:
+            lines.append(f'    {col_repr}: pa.Column({dtype_str}),')
+    
+    lines.extend([
+        "})",
+        "",
+        "def validate_dataframe(df):",
+        '    """Validate DataFrame against schema."""',
+        "    return schema.validate(df)",
+    ])
 
     with open(schema_file, "w") as f:
-        f.write(schema_code)
+        f.write("\n".join(lines))
 
     return schema_file
 
@@ -205,16 +207,11 @@ def scaffold_dataset_schema(
         # Try to load existing schema
         try:
             import importlib.util
-            import types
-
-            spec = importlib.util.spec_from_file_location(f"{slug}_schema", schema_file)
-            if spec is None or spec.loader is None:
-                raise ImportError("Could not load schema module")
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
-            if not hasattr(module, "schema"):
-                raise AttributeError("Schema module has no 'schema' attribute")
-            return module.schema, schema_file  # type: ignore
+            spec = importlib.util.spec_from_file_location("schema_module", schema_file)
+            schema_module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(schema_module)
+            schema = schema_module.schema
+            return schema, schema_file
         except:
             # If loading fails, regenerate
             pass
