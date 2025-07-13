@@ -204,6 +204,12 @@
       "signed": false,
       "signed_at": null
     },
+    "/tmp/tmpsr3d49iq/data/test.csv": {
+      "crc32": "08d6a686",
+      "schema_md5": "3554844d6d80b2a8158f6130068e9261",
+      "signed": false,
+      "signed_at": null
+    },
     "data/a.csv": {
       "crc32": "e093bdca",
       "schema_md5": "0f9a4b582cca17e06e930fa6994d3951",
@@ -271,14 +277,14 @@
       "signed_at": null
     },
     "examples/eg2/data/text_example.csv": {
-      "crc32": "c34af232",
+      "crc32": "49edf67c",
       "schema_md5": "f93ceab48396c0a6323dc7e72d3f74cb",
       "signed": false,
       "signed_at": null
     },
     "tests_e2e/fixtures/test_data.csv": {
-      "crc32": "bfab078f",
-      "schema_md5": "9c3cf2b80bcfb95a2f945c197c193394",
+      "crc32": "ebb40e80",
+      "schema_md5": "b793ecb73179f080bed77236bad75f08",
       "signed": false,
       "signed_at": null
     },
@@ -325,5 +331,5 @@
       "signed_at": null
     }
   },
-  "manifest_md5": "fb2dbca3b1d885a6e48e72641804b19e"
+  "manifest_md5": "6abb98125d8a0f7310a4419c2e96ece2"
 }

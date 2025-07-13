@@ -29,6 +29,10 @@ venv/
 ENV/
 .uv/
 
+# pyc
+*.pyc
+
+
 # Node
 node_modules/
 npm-debug.log*

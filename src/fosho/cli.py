@@ -1,4 +1,4 @@
-"""CLI interface for dsq commands using Typer."""
+"""CLI interface for fosho commands using Typer."""
 
 import sys
 from pathlib import Path
@@ -13,7 +13,7 @@ from .manifest import Manifest
 from .scaffold import scaffold_dataset_schema
 
 app = typer.Typer(
-    name="dsq", help="Data Signing & Quality - Offline data integrity tool"
+    name="fosho", help="Data Signing & Quality - Offline data integrity tool"
 )
 console = Console()
 

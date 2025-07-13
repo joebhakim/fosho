@@ -15,13 +15,14 @@ Stop wondering if your downstream scripts are using the data you think they are.
 # - downstream_script.py (breaks silently when data changes)
 ```
 
-### Step 2: Generate schema (once)
+### Step 2: Generate schema and manifest (once)
 ```bash
-uv run python -c "
-from src.fosho.scaffold import scaffold_dataset_schema
-schema, schema_file = scaffold_dataset_schema('data/my_data.csv')
-print(f'✅ Generated: {schema_file}')
-"
+# Scan your data directory - generates schemas automatically
+uv run fosho scan data/
+
+# This creates:
+# - schemas/my_data_schema.py (auto-generated schema)
+# - manifest.json (tracks file hashes and signing status)
 ```
 
 ### Step 3: Look at schema, edit if needed
@@ -38,7 +39,16 @@ schema = pa.DataFrameSchema({
 ```
 Edit this file if you want stricter validation (ranges, required values, etc.).
 
-### Step 4: Replace your pandas.read_csv() calls
+### Step 4: Sign your data (approve current state)
+```bash
+# Approve the current data state
+uv run fosho sign
+
+# Check status
+uv run fosho status
+```
+
+### Step 5: Replace your pandas.read_csv() calls
 **Before (dangerous):**
 ```python
 import pandas as pd
@@ -47,15 +57,20 @@ df = pd.read_csv('data/my_data.csv')  # Silent failures
 
 **After (safe):**
 ```python
-import pandas as pd
-import sys; sys.path.append('schemas')
-from my_data_schema import validate_dataframe
+import fosho
 
-df = pd.read_csv('data/my_data.csv')
-validated_df = validate_dataframe(df)  # 🚨 CRASHES if data changed
+# Load with validation
+df = fosho.read_csv(
+    file='data/my_data.csv',
+    schema='schemas/my_data_schema.py',
+    manifest_path='manifest.json'
+)
+
+# Must validate before use - crashes if data changed since signing
+validated_df = df.validate()  # 🚨 CRASHES if data changed
 ```
 
-### Step 5: Run your script
+### Step 6: Run your script
 - ✅ **If data matches schema:** Script runs normally
 - 🚨 **If data changed:** Script crashes with clear error message
 - 🎯 **No more silent failures:** You immediately know when data structure changes
@@ -92,12 +107,8 @@ cat analyze_sales.py
 
 **The fosho solution:**
 ```bash
-# 1. Generate schema once
-uv run python -c "
-from src.fosho.scaffold import scaffold_dataset_schema
-schema, schema_file = scaffold_dataset_schema('data/sales.csv')
-print(f'Generated: {schema_file}')
-"
+# 1. Scan and generate schema
+uv run fosho scan data/
 
 # 2. Check what it generated
 cat schemas/sales_schema.py
@@ -107,14 +118,19 @@ cat schemas/sales_schema.py
 #     "revenue": pa.Column(float),
 # })
 
-# 3. Update your script (2 line change)
+# 3. Sign the data state
+uv run fosho sign
+
+# 4. Update your script (safer approach)
 cat analyze_sales_safe.py
-# import pandas as pd
-# import sys; sys.path.append('schemas')
-# from sales_schema import validate_dataframe
+# import fosho
 # 
-# df = pd.read_csv('data/sales.csv')
-# validated_df = validate_dataframe(df)  # <- This line protects you
+# df = fosho.read_csv(
+#     file='data/sales.csv',
+#     schema='schemas/sales_schema.py',
+#     manifest_path='manifest.json'
+# )
+# validated_df = df.validate()  # <- This line protects you
 # print(validated_df['revenue'].mean())  # Now safe!
 ```
 
