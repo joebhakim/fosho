@@ -1,4 +1,0 @@
-patient_info,age
-"{""name"": ""John Doe"", ""allergies"": [""peanuts""], ""emergency_contact"": ""555-1234""}",45
-"{""name"": ""Jane Smith"", ""allergies"": [], ""emergency_contact"": ""555-5678""}",32
-"{""name"": ""Bob Johnson"", ""allergies"": [""shellfish"", ""latex""], ""emergency_contact"": ""555-9999""}",67

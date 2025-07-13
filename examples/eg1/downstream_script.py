@@ -17,3 +17,9 @@ wrapped_df = fosho.read_csv(
 
 
 wrapped_df.validate()  # Error here if not validated
+
+# If we make it to this line, we should be able to use wrapped_df as a df
+
+print("head:", wrapped_df.head())
+
+wrapped_df.to_csv("data/static_notes_wrapped_after_validation.csv")

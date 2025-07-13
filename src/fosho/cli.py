@@ -20,7 +20,7 @@ console = Console()
 
 @app.command()
 def scan(
-    path: str = typer.Argument(".", help="Directory to scan for datasets"),
+    path: str = typer.Argument(..., help="Directory to scan for datasets"),
     overwrite_schemas: bool = typer.Option(
         False, "--overwrite-schemas", help="Regenerate schema stubs even if they exist"
     ),
@@ -36,10 +36,15 @@ def scan(
         console.print(f"[red]Error: Path {path} is not a directory[/red]")
         sys.exit(1)
 
-    # Find all CSV and Parquet files
+    # Find all CSV and Parquet files, excluding common directories to avoid
+    excluded_dirs = {".venv", "venv", "__pycache__", ".git", "node_modules", ".pytest_cache"}
     data_files = []
     for pattern in ["**/*.csv", "**/*.parquet", "**/*.pq"]:
-        data_files.extend(scan_path.glob(pattern))
+        for file_path in scan_path.glob(pattern):
+            # Check if any parent directory is in excluded_dirs
+            if any(part in excluded_dirs for part in file_path.parts):
+                continue
+            data_files.append(file_path)
 
     if not data_files:
         console.print(f"[yellow]No CSV or Parquet files found in {path}[/yellow]")

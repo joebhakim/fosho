@@ -39,8 +39,12 @@ class ValidatedDataFrame:
         if not schema_path.exists():
             raise ValueError(f"Schema file {self._schema_path} not found.")
         
-        import pandera as pa_core
-        self._schema = pa_core.DataFrameSchema.from_yaml(schema_path)
+        # Load Python schema module
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("schema_module", schema_path)
+        schema_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(schema_module)
+        self._schema = schema_module.schema
         
         # Verify schema hasn't changed since signing
         schema_md5 = compute_schema_md5(self._schema)
@@ -75,7 +79,7 @@ def read_csv(file: Union[str, Path], schema: Union[str, Path],
     
     Args:
         file: Path to CSV file
-        schema: Path to YAML schema file
+        schema: Path to Python schema file
         manifest_path: Path to manifest.json file
     
     Returns:
