@@ -122,7 +122,7 @@ def sign():
         console.print("[yellow]No datasets found in manifest[/yellow]")
         sys.exit(1)
 
-    # Verify all files exist and checksums match
+    # Verify all files exist, checksums match, and schemas validate
     console.print("Verifying datasets before signing...")
 
     for file_path, dataset_info in datasets.items():
@@ -140,6 +140,33 @@ def sign():
             console.print(f"  Current:  {current_crc32}")
             sys.exit(1)
 
+        # Verify schema validates against actual data
+        try:
+            from .scaffold import scaffold_dataset_schema
+            from .reader import read_csv_with_schema
+            
+            schema, _ = scaffold_dataset_schema(file_obj, overwrite=False)
+            current_schema_md5 = compute_schema_md5(schema)
+            
+            # Check schema hash matches
+            if current_schema_md5 != dataset_info["schema_md5"]:
+                console.print(f"[red]Error: Schema mismatch for {file_path}[/red]")
+                console.print(f"  Expected schema MD5: {dataset_info['schema_md5']}")
+                console.print(f"  Current schema MD5:  {current_schema_md5}")
+                console.print(f"  Run 'fosho scan' to update the manifest")
+                sys.exit(1)
+            
+            # Validate data against schema
+            df = read_csv_with_schema(file_obj, schema)
+            validated_df = df.validate()  # This will raise if schema doesn't fit data
+            console.print(f"  [green]✓ Schema validates {file_path}[/green]")
+            
+        except Exception as e:
+            console.print(f"[red]Error: Schema validation failed for {file_path}[/red]")
+            console.print(f"  {str(e)}")
+            console.print(f"  Please fix the schema or data before signing")
+            sys.exit(1)
+
     # All verifications passed, sign all datasets
     manifest.sign_all()
     manifest.save()
@@ -147,68 +174,11 @@ def sign():
     console.print(f"[green]Successfully signed {len(datasets)} dataset(s)[/green]")
 
 
-@app.command()
-def verify():
-    """Verify integrity of all signed datasets."""
-    manifest = Manifest()
-    manifest.load()
-
-    datasets = manifest.get_all_datasets()
-    if not datasets:
-        console.print("[yellow]No datasets found in manifest[/yellow]")
-        sys.exit(1)
-
-    # Verify manifest integrity
-    if not manifest.verify_integrity():
-        console.print("[red]Error: Manifest integrity check failed[/red]")
-        sys.exit(1)
-
-    errors = []
-    unsigned_count = 0
-
-    for file_path, dataset_info in datasets.items():
-        file_obj = Path(file_path)
-
-        # Check if file exists
-        if not file_obj.exists():
-            errors.append(f"File missing: {file_path}")
-            continue
-
-        # Check if signed
-        if not dataset_info["signed"]:
-            unsigned_count += 1
-            continue
-
-        # Verify checksum
-        current_crc32 = compute_file_crc32(file_obj)
-        if current_crc32 != dataset_info["crc32"]:
-            errors.append(f"Checksum mismatch: {file_path}")
-            # Mark as unsigned due to changes
-            manifest.unsign_dataset(file_path)
-
-    # Save manifest if we unmarked any datasets
-    if any(not info["signed"] for info in datasets.values()):
-        manifest.save()
-
-    # Report results
-    if errors:
-        console.print("[red]Verification failed:[/red]")
-        for error in errors:
-            console.print(f"  - {error}")
-        sys.exit(1)
-
-    if unsigned_count > 0:
-        console.print(
-            f"[yellow]Warning: {unsigned_count} dataset(s) not signed[/yellow]"
-        )
-        sys.exit(1)
-
-    console.print("[green]All datasets verified successfully[/green]")
 
 
 @app.command()
 def status():
-    """Show status of all datasets in manifest."""
+    """Show status of all datasets with file, data, and schema verification."""
     manifest = Manifest()
     manifest.load()
 
@@ -217,13 +187,62 @@ def status():
         console.print("[yellow]No datasets found in manifest[/yellow]")
         return
 
+    # Verify manifest integrity first
+    manifest_integrity = manifest.verify_integrity()
+    if not manifest_integrity:
+        console.print("[red]Warning: Manifest integrity check failed[/red]")
+
     table = Table()
     table.add_column("Dataset", style="cyan")
     table.add_column("CRC32", style="magenta")
     table.add_column("Status", style="green")
+    table.add_column("File Status")
+    table.add_column("Data Status")
+    table.add_column("Schema Status")
     table.add_column("Signed At")
 
+    changes_detected = False
+
     for file_path, info in datasets.items():
+        file_obj = Path(file_path)
+
+        # Check file existence
+        if file_obj.exists():
+            file_status = "[green]✓ Exists[/green]"
+            
+            # Check data integrity (CRC32)
+            try:
+                current_crc32 = compute_file_crc32(file_obj)
+                data_match = current_crc32 == info["crc32"]
+                data_status = "[green]✓ Valid[/green]" if data_match else "[red]✗ Changed[/red]"
+                
+                # Check schema if file exists and we can load it
+                try:
+                    from .scaffold import scaffold_dataset_schema
+                    schema, _ = scaffold_dataset_schema(file_obj, overwrite=False)
+                    current_schema_md5 = compute_schema_md5(schema)
+                    schema_match = current_schema_md5 == info["schema_md5"]
+                    schema_status = "[green]✓ Valid[/green]" if schema_match else "[yellow]⚠ Changed[/yellow]"
+                except Exception:
+                    schema_status = "[gray]? Unknown[/gray]"
+                    schema_match = True  # Don't treat as error if we can't check
+                
+                # Mark as unsigned if data changed
+                if not data_match and info["signed"]:
+                    manifest.unsign_dataset(file_path)
+                    changes_detected = True
+                    info["signed"] = False
+                    info["signed_at"] = None
+                    
+            except Exception as e:
+                data_status = f"[red]✗ Error: {str(e)[:20]}...[/red]"
+                schema_status = "[gray]? Unknown[/gray]"
+        else:
+            file_status = "[red]✗ Missing[/red]"
+            data_status = "[red]✗ Missing[/red]"
+            schema_status = "[red]✗ Missing[/red]"
+
+        # Overall status
         status_text = "✓ Signed" if info["signed"] else "✗ Unsigned"
         status_style = "green" if info["signed"] else "yellow"
 
@@ -231,10 +250,23 @@ def status():
             file_path,
             info["crc32"],
             f"[{status_style}]{status_text}[/{status_style}]",
+            file_status,
+            data_status,
+            schema_status,
             info["signed_at"] or "Never",
         )
 
     console.print(table)
+
+    # Save manifest if we unmarked any datasets due to data changes
+    if changes_detected:
+        manifest.save()
+        console.print("\n[yellow]Note: Some datasets were automatically unsigned due to data changes[/yellow]")
+
+    # Summary counts
+    total = len(datasets)
+    signed_count = sum(1 for info in datasets.values() if info["signed"])
+    console.print(f"\nSummary: {signed_count}/{total} datasets signed")
 
 
 if __name__ == "__main__":

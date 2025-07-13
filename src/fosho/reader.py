@@ -108,3 +108,34 @@ def read_csv(file: Union[str, Path], schema: Union[str, Path],
         relative_file_path = str(file_path)
     
     return ValidatedDataFrame(df, relative_file_path, str(schema_path), manifest)
+
+
+def read_csv_with_schema(file: Union[str, Path], schema: pa.DataFrameSchema) -> ValidatedDataFrame:
+    """Read CSV file with provided schema for validation (used during signing).
+    
+    Args:
+        file: Path to CSV file
+        schema: Pandera DataFrameSchema object
+    
+    Returns:
+        ValidatedDataFrame wrapper with validation methods
+    """
+    file_path = Path(file)
+    
+    if not file_path.exists():
+        raise FileNotFoundError(f"Data file not found: {file}")
+    
+    # Load DataFrame
+    df = pd.read_csv(file_path)
+    
+    # Create a minimal ValidatedDataFrame for testing validation only
+    class MinimalValidatedDataFrame:
+        def __init__(self, df: pd.DataFrame, schema: pa.DataFrameSchema):
+            self._df = df
+            self._schema = schema
+        
+        def validate(self) -> pd.DataFrame:
+            """Validate DataFrame against schema."""
+            return self._schema.validate(self._df)
+    
+    return MinimalValidatedDataFrame(df, schema)

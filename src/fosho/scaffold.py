@@ -148,18 +148,21 @@ def generate_schema_file(
         else:
             col_repr = repr(col_name)
         
-        # Map dtypes to simple Python types
+        # Preserve exact pandas dtype to maintain consistency
         dtype_name = str(col_schema.dtype)
         if "int" in dtype_name:
             dtype_str = "int"
         elif "float" in dtype_name:
             dtype_str = "float"
-        elif "object" in dtype_name or "string" in dtype_name:
+        elif "object" in dtype_name:
+            # Keep as object dtype to match pandas inference
+            dtype_str = "object"
+        elif "string" in dtype_name:
             dtype_str = "str"
         elif "bool" in dtype_name:
             dtype_str = "bool"
         else:
-            dtype_str = "str"  # Default fallback
+            dtype_str = "object"  # Default to object to match pandas behavior
         
         # Simple column definition
         if col_schema.nullable:

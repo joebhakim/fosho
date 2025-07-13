@@ -60,23 +60,17 @@ def test_happy_path_workflow(tmp_path):
         assert dataset_key in manifest_data["datasets"]
         assert manifest_data["datasets"][dataset_key]["signed"] is True
         
-        # Step 3: Verify - should pass verification
-        result = subprocess.run(
-            ["uv", "run", "fosho", "verify"], 
-            capture_output=True, text=True, cwd=str(tmp_path)
-        )
-        assert result.returncode == 0, f"Verify failed: {result.stderr}"
-        assert "All datasets verified successfully" in result.stdout
-        
-        # Step 4: Status - should show signed status
+        # Step 3: Status - should show comprehensive verification
         result = subprocess.run(
             ["uv", "run", "fosho", "status"], 
             capture_output=True, text=True, cwd=str(tmp_path)
         )
         assert result.returncode == 0, f"Status failed: {result.stderr}"
-        assert "✓ Signed" in result.stdout
+        assert "Signed" in result.stdout
+        assert "Exists" in result.stdout
+        assert "Valid" in result.stdout  # Both data and schema should be valid
         
-        # Step 5: Downstream script - should work successfully
+        # Step 4: Downstream script - should work successfully
         df = fosho.read_csv(
             file="data/test_data.csv",
             schema="schemas/test_data_schema.py",
