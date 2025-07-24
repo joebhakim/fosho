@@ -2,29 +2,47 @@
 name = "fosho"
 version = "0.1.0"
 description = "Data Signing & Quality - Offline data integrity with CRC32 file hashing and MD5 schema hashing"
-readme = "readme.md"
+readme = "README.md"
+license = {text = "MIT"}
 authors = [
     { name = "Joe Hakim", email = "joebhakim@gmail.com" }
 ]
+maintainers = [
+    { name = "Joe Hakim", email = "joebhakim@gmail.com" }
+]
+keywords = ["data-validation", "data-integrity", "schema", "crc32", "pandera", "csv", "parquet"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Software Development :: Quality Assurance",
+]
 requires-python = ">=3.9"
+
 dependencies = [
     "pandas>=2.2",
     "pandera[io]>=0.18",
-    "typer[all]",
+    "typer",
+    "rich",
     "pyarrow",
     "python-dateutil",
     "PyYAML",
-    "black",
     "frictionless"
 ]
 
-[project.optional-dependencies]
-dev = [
-    "pytest",
-    "ruff", 
-    "black",
-    "pytest-socket"
-]
+[project.urls]
+Homepage = "https://github.com/joebhakim/fosho"
+Repository = "https://github.com/joebhakim/fosho"
+Issues = "https://github.com/joebhakim/fosho/issues"
+Changelog = "https://github.com/joebhakim/fosho/blob/main/CHANGELOG.md"
 
 [project.scripts]
 fosho = "fosho:main"
@@ -36,4 +54,7 @@ build-backend = "hatchling.build"
 [dependency-groups]
 dev = [
     "pytest>=8.4.1",
+    "ruff", 
+    "black",
+    "pytest-socket"
 ]

@@ -31,7 +31,7 @@ def temp_workspace():
 
 
 def test_cli_scan_command(temp_workspace):
-    """Test dsq scan command."""
+    """Test fosho scan command."""
     runner = CliRunner()
     
     # Change to temp workspace
@@ -63,7 +63,7 @@ def test_cli_scan_command(temp_workspace):
 
 
 def test_cli_sign_command(temp_workspace):
-    """Test dsq sign command."""
+    """Test fosho sign command."""
     runner = CliRunner()
     
     original_cwd = Path.cwd()
@@ -91,8 +91,28 @@ def test_cli_sign_command(temp_workspace):
         os.chdir(original_cwd)
 
 
-def test_cli_verify_command(temp_workspace):
-    """Test dsq verify command."""
+def test_cli_status_with_unsigned_dataset(temp_workspace):
+    """Test status command fails verification with unsigned dataset."""
+    runner = CliRunner()
+    
+    original_cwd = Path.cwd()
+    try:
+        import os
+        os.chdir(temp_workspace)
+        
+        # Only scan, don't sign
+        runner.invoke(app, ["scan", "."])
+        
+        # Status should fail verification (exit code 1) due to unsigned dataset
+        result = runner.invoke(app, ["status"])
+        assert result.exit_code == 1
+        
+    finally:
+        os.chdir(original_cwd)
+
+
+def test_cli_status_after_sign(temp_workspace):
+    """Test status command passes verification after signing."""
     runner = CliRunner()
     
     original_cwd = Path.cwd()
@@ -104,38 +124,16 @@ def test_cli_verify_command(temp_workspace):
         runner.invoke(app, ["scan", "."])
         runner.invoke(app, ["sign"])
         
-        # Verify should pass
-        result = runner.invoke(app, ["verify"])
+        # Status should pass verification (exit code 0)
+        result = runner.invoke(app, ["status"])
         assert result.exit_code == 0
-        assert "All datasets verified successfully" in result.stdout
         
     finally:
         os.chdir(original_cwd)
 
 
-def test_cli_verify_with_unsigned_dataset(temp_workspace):
-    """Test dsq verify command with unsigned dataset."""
-    runner = CliRunner()
-    
-    original_cwd = Path.cwd()
-    try:
-        import os
-        os.chdir(temp_workspace)
-        
-        # Only scan, don't sign
-        runner.invoke(app, ["scan", "."])
-        
-        # Verify should fail with warning
-        result = runner.invoke(app, ["verify"])
-        assert result.exit_code == 1
-        assert "dataset(s) not signed" in result.stdout
-        
-    finally:
-        os.chdir(original_cwd)
-
-
-def test_cli_verify_with_modified_file(temp_workspace):
-    """Test dsq verify command after file modification."""
+def test_cli_status_with_modified_file(temp_workspace):
+    """Test status command fails verification after file modification."""
     runner = CliRunner()
     
     original_cwd = Path.cwd()
@@ -151,17 +149,16 @@ def test_cli_verify_with_modified_file(temp_workspace):
         with open("test.csv", "a") as f:
             f.write("4,David,40\n")
         
-        # Verify should fail
-        result = runner.invoke(app, ["verify"])
+        # Status should fail verification (exit code 1) due to changed data
+        result = runner.invoke(app, ["status"])
         assert result.exit_code == 1
-        assert "Checksum mismatch" in result.stdout
         
     finally:
         os.chdir(original_cwd)
 
 
-def test_cli_status_command(temp_workspace):
-    """Test dsq status command."""
+def test_cli_status_json_output(temp_workspace):
+    """Test status command JSON output."""
     runner = CliRunner()
     
     original_cwd = Path.cwd()
@@ -169,27 +166,27 @@ def test_cli_status_command(temp_workspace):
         import os
         os.chdir(temp_workspace)
         
-        # Scan first
+        # Scan and sign
         runner.invoke(app, ["scan", "."])
-        
-        # Check status
-        result = runner.invoke(app, ["status"])
-        assert result.exit_code == 0
-        assert "test.csv" in result.stdout
-        assert "Unsigned" in result.stdout
-        
-        # Sign and check status again
         runner.invoke(app, ["sign"])
-        result = runner.invoke(app, ["status"])
+        
+        # Get JSON status
+        result = runner.invoke(app, ["status", "--json"])
         assert result.exit_code == 0
-        assert "Signed" in result.stdout
+        
+        # Parse JSON output
+        status_data = json.loads(result.stdout)
+        assert status_data["verification_passed"] == True
+        assert status_data["total_datasets"] == 1
+        assert status_data["signed_datasets"] == 1
+        assert "test.csv" in status_data["datasets"]
         
     finally:
         os.chdir(original_cwd)
 
 
 def test_full_cli_workflow(temp_workspace):
-    """Test complete CLI workflow as specified in requirements."""
+    """Test complete CLI workflow."""
     runner = CliRunner()
     
     original_cwd = Path.cwd()
@@ -205,29 +202,33 @@ def test_full_cli_workflow(temp_workspace):
         schemas_dir = temp_workspace / "schemas"
         assert schemas_dir.exists()
         
-        # Step 2: Sign datasets
+        # Step 2: Status should fail (unsigned)
+        result = runner.invoke(app, ["status"])
+        assert result.exit_code == 1
+        
+        # Step 3: Sign datasets
         result = runner.invoke(app, ["sign"])
         assert result.exit_code == 0
         
-        # Step 3: Verify should pass
-        result = runner.invoke(app, ["verify"])
+        # Step 4: Status should pass (all signed)
+        result = runner.invoke(app, ["status"])
         assert result.exit_code == 0
         
-        # Step 4: Modify a file (simulate drift)
+        # Step 5: Modify a file (simulate drift)
         with open("test.csv", "a") as f:
             f.write("999,Hacker,25\n")
         
-        # Step 5: Verify should fail
-        result = runner.invoke(app, ["verify"])
+        # Step 6: Status should fail due to changes
+        result = runner.invoke(app, ["status"])
         assert result.exit_code == 1
         
-        # Step 6: Re-scan should detect changes
+        # Step 7: Re-scan should detect changes
         result = runner.invoke(app, ["scan", "."])
         assert result.exit_code == 0
         
-        # Verify shows unsigned due to changes
-        result = runner.invoke(app, ["verify"])
-        assert result.exit_code == 1  # Should fail due to unsigned dataset
+        # Step 8: Status should still fail due to unsigned datasets after changes
+        result = runner.invoke(app, ["status"])
+        assert result.exit_code == 1
         
     finally:
         os.chdir(original_cwd)

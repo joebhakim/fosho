@@ -215,17 +215,17 @@ name = "fosho"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "black" },
     { name = "frictionless" },
     { name = "pandas" },
     { name = "pandera", extra = ["io"] },
     { name = "pyarrow" },
     { name = "python-dateutil" },
     { name = "pyyaml" },
+    { name = "rich" },
     { name = "typer" },
 ]
 
-[package.optional-dependencies]
+[package.dev-dependencies]
 dev = [
     { name = "black" },
     { name = "pytest" },
@@ -233,30 +233,25 @@ dev = [
     { name = "ruff" },
 ]
 
-[package.dev-dependencies]
-dev = [
-    { name = "pytest" },
-]
-
 [package.metadata]
 requires-dist = [
-    { name = "black" },
-    { name = "black", marker = "extra == 'dev'" },
     { name = "frictionless" },
     { name = "pandas", specifier = ">=2.2" },
     { name = "pandera", extras = ["io"], specifier = ">=0.18" },
     { name = "pyarrow" },
-    { name = "pytest", marker = "extra == 'dev'" },
-    { name = "pytest-socket", marker = "extra == 'dev'" },
     { name = "python-dateutil" },
     { name = "pyyaml" },
-    { name = "ruff", marker = "extra == 'dev'" },
-    { name = "typer", extras = ["all"] },
+    { name = "rich" },
+    { name = "typer" },
 ]
-provides-extras = ["dev"]
 
 [package.metadata.requires-dev]
-dev = [{ name = "pytest", specifier = ">=8.4.1" }]
+dev = [
+    { name = "black" },
+    { name = "pytest", specifier = ">=8.4.1" },
+    { name = "pytest-socket" },
+    { name = "ruff" },
+]
 
 [[package]]
 name = "frictionless"

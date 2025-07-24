@@ -1,29 +1,29 @@
 {
   "datasets": {
     "data/complex_metrics.csv": {
-      "crc32": "34e89325",
+      "crc32": "ee882bf5",
       "schema_md5": "2fa8ea1599ddb726bf9f28410d3d36f0",
       "signed": true,
-      "signed_at": "2025-07-24T19:35:22.278691Z"
+      "signed_at": "2025-07-24T19:51:47.951504Z"
     },
     "data/nested_json.csv": {
       "crc32": "65943087",
       "schema_md5": "278e0c2bc051b8d4fd6ba97fefbc4967",
       "signed": true,
-      "signed_at": "2025-07-24T19:35:22.278701Z"
+      "signed_at": "2025-07-24T19:51:47.951515Z"
     },
     "data/static_notes.csv": {
       "crc32": "c1c505d5",
       "schema_md5": "b96f9ef9b25b9dd9ccf48d885f03b048",
       "signed": true,
-      "signed_at": "2025-07-24T19:35:22.278704Z"
+      "signed_at": "2025-07-24T19:51:47.951518Z"
     },
     "data/vitals_multiindex.csv": {
       "crc32": "66cf0924",
       "schema_md5": "e5389841369750dc0eb1f8d2483d8f2f",
       "signed": true,
-      "signed_at": "2025-07-24T19:35:22.278706Z"
+      "signed_at": "2025-07-24T19:51:47.951520Z"
     }
   },
-  "manifest_md5": "633b5849faa6a4881e97d5b95f272a0d"
+  "manifest_md5": "51e27b97a4987884eb9de0ffcfa81a59"
 }

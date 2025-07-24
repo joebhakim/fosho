@@ -1,0 +1,35 @@
+{
+  "datasets": {
+    "examples/eg1/data/complex_metrics.csv": {
+      "crc32": "34e89325",
+      "schema_md5": "2fa8ea1599ddb726bf9f28410d3d36f0",
+      "signed": false,
+      "signed_at": null
+    },
+    "examples/eg1/data/nested_json.csv": {
+      "crc32": "65943087",
+      "schema_md5": "278e0c2bc051b8d4fd6ba97fefbc4967",
+      "signed": true,
+      "signed_at": "2025-07-24T19:41:43.976816Z"
+    },
+    "examples/eg1/data/static_notes.csv": {
+      "crc32": "c1c505d5",
+      "schema_md5": "b96f9ef9b25b9dd9ccf48d885f03b048",
+      "signed": true,
+      "signed_at": "2025-07-24T19:41:43.976818Z"
+    },
+    "examples/eg1/data/vitals_multiindex.csv": {
+      "crc32": "66cf0924",
+      "schema_md5": "e5389841369750dc0eb1f8d2483d8f2f",
+      "signed": true,
+      "signed_at": "2025-07-24T19:41:43.976820Z"
+    },
+    "examples/eg2/data/text_example.csv": {
+      "crc32": "c34af232",
+      "schema_md5": "b96f9ef9b25b9dd9ccf48d885f03b048",
+      "signed": true,
+      "signed_at": "2025-07-24T19:41:43.976822Z"
+    }
+  },
+  "manifest_md5": "ebe062ec08ef2deba0bf91daefbc8016"
+}

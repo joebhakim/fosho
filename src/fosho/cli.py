@@ -151,9 +151,18 @@ def sign():
         # Verify checksum
         current_crc32 = compute_file_crc32(file_obj)
         if current_crc32 != dataset_info["crc32"]:
-            console.print(f"[red]Error: Checksum mismatch for {file_path}[/red]")
-            console.print(f"  Expected: {dataset_info['crc32']}")
-            console.print(f"  Current:  {current_crc32}")
+            console.print(f"[red]Error: Data has changed in {file_path}[/red]")
+            console.print(f"  Previous checksum: {dataset_info['crc32']}")
+            console.print(f"  Current checksum:  {current_crc32}")
+            console.print("\n[yellow]To resolve this:[/yellow]")
+            console.print("  1. If the changes are expected:")
+            console.print(
+                "     Run 'fosho scan' to update the manifest with the new data"
+            )
+            console.print("     Then run 'fosho sign' to approve the changes")
+            console.print("  2. If the changes are unexpected:")
+            console.print("     Check the file contents to understand what changed")
+            console.print("     Restore the file to its previous state if needed")
             sys.exit(1)
 
         # Verify schema validates against actual data
@@ -180,7 +189,7 @@ def sign():
         except Exception as e:
             console.print(f"[red]Error: Schema validation failed for {file_path}[/red]")
             console.print(f"  {str(e)}")
-            console.print(f"  Please fix the schema or data before signing")
+            console.print(f"  Please fix the schema (or data?!) before signing")
             sys.exit(1)
 
     # All verifications passed, sign all datasets
@@ -191,7 +200,9 @@ def sign():
 
 
 @app.command()
-def status():
+def status(
+    json_output: bool = typer.Option(False, "--json", help="Output status as JSON for machine parsing")
+):
     """Show status of all datasets with file, data, and schema verification.\n\n
 
     # Column summaries: \n\n
@@ -214,21 +225,22 @@ def status():
 
     # Verify manifest integrity first
     manifest_integrity = manifest.verify_integrity()
-    if not manifest_integrity:
+    if not manifest_integrity and not json_output:
         console.print("[red]Warning: Manifest integrity check failed[/red]")
 
-    # Hint user to run with --help to understand the columns
-    console.print("[yellow]Hint: Run with --help for column descriptions[/yellow]")
+    if not json_output:
+        # Hint user to run with --help to understand the columns
+        console.print("[yellow]Hint: Run with --help for column descriptions[/yellow]")
 
-    table = Table()
-    table.add_column("Dataset", style="cyan")
-    table.add_column("CRC32", style="magenta")
-    table.add_column("Status", style="green")
-    table.add_column("File Status")
-    table.add_column("Data Status")
-    table.add_column("Schema Status")
-    table.add_column("Schema Path", style="blue")
-    table.add_column("Signed At")
+        table = Table()
+        table.add_column("Dataset", style="cyan")
+        table.add_column("CRC32", style="magenta")
+        table.add_column("Status", style="green")
+        table.add_column("File Status")
+        table.add_column("Data Status")
+        table.add_column("Schema Status")
+        table.add_column("Schema Path", style="blue")
+        table.add_column("Signed At")
 
     changes_detected = False
 
@@ -244,7 +256,9 @@ def status():
                 current_crc32 = compute_file_crc32(file_obj)
                 data_match = current_crc32 == info["crc32"]
                 data_status = (
-                    "[green]✓ Valid[/green]" if data_match else "[red]✗ Changed[/red]"
+                    "[green]✓ Unchanged[/green]"
+                    if data_match
+                    else "[red]✗ Modified[/red]"
                 )
 
                 # Check schema if file exists and we can load it
@@ -257,9 +271,9 @@ def status():
                     current_schema_md5 = compute_schema_md5(schema)
                     schema_match = current_schema_md5 == info["schema_md5"]
                     schema_status = (
-                        "[green]✓ Valid[/green]"
+                        "[green]✓ Matches Data[/green]"
                         if schema_match
-                        else "[yellow]⚠ Changed[/yellow]"
+                        else "[yellow]⚠ Out of Sync[/yellow]"
                     )
                     schema_path = (
                         str(schema_file) if schema_file else "[gray]None[/gray]"
@@ -281,45 +295,142 @@ def status():
                 schema_status = "[gray]? Unknown[/gray]"
                 schema_path = "[gray]Unknown[/gray]"
         else:
-            file_status = "[red]✗ Missing[/red]"
-            data_status = "[red]✗ Missing[/red]"
-            schema_status = "[red]✗ Missing[/red]"
-            schema_path = "[red]Missing[/red]"
+            file_status = "[red]✗ Not Found[/red]"
+            data_status = "[red]✗ File Missing[/red]"
+            schema_status = "[red]✗ Can't Check[/red]"
+            schema_path = "[red]Not Found[/red]"
 
-        # Overall status
-        status_text = "✓ Signed" if info["signed"] else "✗ Unsigned"
-        status_style = "green" if info["signed"] else "yellow"
+        # Overall status - only add to table if not JSON output
+        if not json_output:
+            status_text = "✓ Signed" if info["signed"] else "✗ Unsigned"
+            status_style = "green" if info["signed"] else "yellow"
 
-        table.add_row(
-            file_path,
-            info["crc32"],
-            f"[{status_style}]{status_text}[/{status_style}]",
-            file_status,
-            data_status,
-            schema_status,
-            schema_path,
-            info["signed_at"] or "Never",
-        )
+            table.add_row(
+                file_path,
+                info["crc32"],
+                f"[{status_style}]{status_text}[/{status_style}]",
+                file_status,
+                data_status,
+                schema_status,
+                schema_path,
+                info["signed_at"] or "Never",
+            )
 
-    console.print(table)
+    if not json_output:
+        console.print(table)
 
     # Save manifest if we unmarked any datasets due to data changes
     if changes_detected:
         manifest.save()
-        console.print(
-            "\n[yellow]Note: Some datasets were automatically unsigned due to data changes[/yellow]"
-        )
+        if not json_output:
+            console.print(
+                "\n[yellow]Note: Some datasets were automatically unsigned due to data changes[/yellow]"
+            )
 
-    # Summary counts
+    # Summary counts and verification status
     total = len(datasets)
     signed_count = sum(1 for info in datasets.values() if info["signed"])
-    console.print(f"\nSummary: {signed_count}/{total} datasets signed")
 
-    # If there are any unsigned datasets, hint user to first check the data (with e.g. head -n 10 $data_file), then the schema (with e.g. cat $schema_file), then sign
-    if any(not info["signed"] for info in datasets.values()):
-        console.print(
-            "[yellow]Hint: First check the data (with e.g. head -n 10 $data_file), then the schema (with e.g. cat $schema_file), then sign[/yellow]"
-        )
+    # Collect all issues that would prevent successful downstream usage
+    issues = []
+
+    # Check for unsigned datasets
+    unsigned_count = total - signed_count
+    if unsigned_count > 0:
+        issues.append(f"{unsigned_count} dataset(s) not signed")
+
+    # Check for missing files
+    missing_files = [
+        path
+        for path, info in datasets.items()
+        if not Path(path).exists() and info["signed"]
+    ]
+    if missing_files:
+        issues.append(f"{len(missing_files)} signed dataset(s) missing")
+
+    # Check for data changes after signing
+    changed_data = []
+    changed_schemas = []
+    for path, info in datasets.items():
+        if info["signed"] and Path(path).exists():
+            try:
+                current_crc32 = compute_file_crc32(Path(path))
+                if current_crc32 != info["crc32"]:
+                    changed_data.append(path)
+
+                schema, _ = scaffold_dataset_schema(Path(path), overwrite=False)
+                current_schema_md5 = compute_schema_md5(schema)
+                if current_schema_md5 != info["schema_md5"]:
+                    changed_schemas.append(path)
+            except Exception:
+                # If we can't verify, treat as an issue
+                issues.append(f"Cannot verify '{path}' integrity")
+
+    if changed_data:
+        issues.append(f"{len(changed_data)} signed dataset(s) modified after signing")
+    if changed_schemas:
+        issues.append(f"{len(changed_schemas)} schema(s) changed after signing")
+
+    # Prepare status data for JSON output or exit code determination
+    status_data = {
+        "total_datasets": total,
+        "signed_datasets": signed_count,
+        "verification_passed": len(issues) == 0,
+        "issues": issues,
+        "datasets": {}
+    }
+    
+    # Add detailed dataset info for JSON
+    for path, info in datasets.items():
+        file_obj = Path(path)
+        dataset_status = {
+            "signed": info["signed"],
+            "signed_at": info["signed_at"],
+            "crc32": info["crc32"],
+            "schema_md5": info["schema_md5"],
+            "file_exists": file_obj.exists(),
+            "data_unchanged": True,
+            "schema_unchanged": True
+        }
+        
+        if file_obj.exists():
+            try:
+                current_crc32 = compute_file_crc32(file_obj)
+                dataset_status["data_unchanged"] = current_crc32 == info["crc32"]
+                
+                schema, _ = scaffold_dataset_schema(file_obj, overwrite=False)
+                current_schema_md5 = compute_schema_md5(schema)
+                dataset_status["schema_unchanged"] = current_schema_md5 == info["schema_md5"]
+            except Exception:
+                dataset_status["data_unchanged"] = False
+                dataset_status["schema_unchanged"] = False
+        
+        status_data["datasets"][path] = dataset_status
+
+    if json_output:
+        import json
+        console.print(json.dumps(status_data, indent=2))
+    else:
+        # Print human-readable output
+        console.print(f"\nSummary: {signed_count}/{total} datasets signed")
+
+        if issues:
+            console.print("\n[red]❌ fosho verification failed:[/red]")
+            for issue in issues:
+                console.print(f"[red]  - {issue}[/red]")
+            console.print(
+                "\n[yellow]Hint: Run 'fosho scan' to update manifest, then check and re-sign affected datasets[/yellow]"
+            )
+        else:
+            console.print(
+                "\n[green]✓ fosho verification passed - all datasets are signed and verified[/green]"
+            )
+    
+    # Exit with appropriate code for machine parsing
+    if issues:
+        sys.exit(1)  # Verification failed
+    else:
+        sys.exit(0)  # Verification passed
 
 
 if __name__ == "__main__":
