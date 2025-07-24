@@ -7,10 +7,10 @@ schema = pa.DataFrameSchema({
     'Heart Rate (bpm)': pa.Column(int),
     'Blood Pressure@Systolic': pa.Column(float),
     'Temperature °C': pa.Column(float),
-    'Status-Code': pa.Column(str),
-    'Mixed$Column': pa.Column(str),
+    'Status-Code': pa.Column(object),
+    'Mixed$Column': pa.Column(object),
     'Weight (kg)': pa.Column(float, nullable=True),
-    'Notes & Comments': pa.Column(str),
+    'Notes & Comments': pa.Column(object),
 })
 
 def validate_dataframe(df):

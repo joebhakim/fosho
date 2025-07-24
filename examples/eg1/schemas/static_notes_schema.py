@@ -1,12 +1,12 @@
-"""Auto-generated schema for text_example.csv."""
+"""Auto-generated schema for static_notes.csv."""
 
 import pandera.pandas as pa
 
 schema = pa.DataFrameSchema({
     "id": pa.Column(int),
-    "timestamp": pa.Column(str),
-    "category": pa.Column(str),
-    "notes": pa.Column(str),
+    "timestamp": pa.Column(object),
+    "category": pa.Column(object),
+    "notes": pa.Column(object),
     "value": pa.Column(int),
 })
 
