@@ -201,6 +201,7 @@ def status():
     # - File Status: Exists or missing, referencing the file path and what the manifest.json expects \n\n
     # - Data Status: When the data changes (it happens), we want to flag this as "invalid" so the diligent user re-checks stuff and re-signs \n\n
     # - Schema Status: Similar to data status but with the schema. \n\n
+    # - Schema Path: The path to the corresponding schema file \n\n
     # - Signed At: The date and time the dataset was signed
     """
     manifest = Manifest()
@@ -226,6 +227,7 @@ def status():
     table.add_column("File Status")
     table.add_column("Data Status")
     table.add_column("Schema Status")
+    table.add_column("Schema Path", style="blue")
     table.add_column("Signed At")
 
     changes_detected = False
@@ -249,7 +251,9 @@ def status():
                 try:
                     from .scaffold import scaffold_dataset_schema
 
-                    schema, _ = scaffold_dataset_schema(file_obj, overwrite=False)
+                    schema, schema_file = scaffold_dataset_schema(
+                        file_obj, overwrite=False
+                    )
                     current_schema_md5 = compute_schema_md5(schema)
                     schema_match = current_schema_md5 == info["schema_md5"]
                     schema_status = (
@@ -257,9 +261,13 @@ def status():
                         if schema_match
                         else "[yellow]⚠ Changed[/yellow]"
                     )
+                    schema_path = (
+                        str(schema_file) if schema_file else "[gray]None[/gray]"
+                    )
                 except Exception:
                     schema_status = "[gray]? Unknown[/gray]"
                     schema_match = True  # Don't treat as error if we can't check
+                    schema_path = "[gray]Unknown[/gray]"
 
                 # Mark as unsigned if data changed
                 if not data_match and info["signed"]:
@@ -271,10 +279,12 @@ def status():
             except Exception as e:
                 data_status = f"[red]✗ Error: {str(e)[:20]}...[/red]"
                 schema_status = "[gray]? Unknown[/gray]"
+                schema_path = "[gray]Unknown[/gray]"
         else:
             file_status = "[red]✗ Missing[/red]"
             data_status = "[red]✗ Missing[/red]"
             schema_status = "[red]✗ Missing[/red]"
+            schema_path = "[red]Missing[/red]"
 
         # Overall status
         status_text = "✓ Signed" if info["signed"] else "✗ Unsigned"
@@ -287,6 +297,7 @@ def status():
             file_status,
             data_status,
             schema_status,
+            schema_path,
             info["signed_at"] or "Never",
         )
 
