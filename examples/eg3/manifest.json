@@ -1,0 +1,14 @@
+{
+  "datasets": {
+    "Anthropic/hh-rlhf": {
+      "dataset_hash": "f789fa9c525c23490cc21bf57efcb366",
+      "dataset_name": "Anthropic/hh-rlhf",
+      "scaffolded": false,
+      "schema_path": null,
+      "signed": false,
+      "signed_at": null,
+      "source_type": "remote_dataset"
+    }
+  },
+  "manifest_md5": "facd96ed6b2e39d1f2b259cc4d220dc6"
+}

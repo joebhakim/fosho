@@ -31,7 +31,8 @@ dependencies = [
     "pyarrow",
     "python-dateutil",
     "PyYAML",
-    "frictionless"
+    "frictionless",
+    "datasets>=4.0.0",
 ]
 
 [project.urls]

@@ -27,28 +27,22 @@ app = typer.Typer(
 console = Console()
 
 
-@app.command()
-def scan(
-    path: str = typer.Argument(..., help="Directory to scan for datasets"),
-    overwrite_schemas: bool = typer.Option(
-        False, "--overwrite-schemas", help="Regenerate schema stubs even if they exist"
-    ),
-):
-    """Scan directory for datasets, generate schemas, and update manifest."""
-    scan_path = Path(path)
+def _scan_local_directory(directory: str, manifest_path: str) -> None:
+    """Scan local directory for CSV/Parquet files and add to manifest."""
+    scan_path = Path(directory)
 
     if not scan_path.exists():
-        console.print(f"[red]Error: Path {path} does not exist[/red]")
+        console.print(f"[red]Error: Path {directory} does not exist[/red]")
         sys.exit(1)
 
     if not scan_path.is_dir():
-        console.print(f"[red]Error: Path {path} is not a directory[/red]")
+        console.print(f"[red]Error: Path {directory} is not a directory[/red]")
         sys.exit(1)
 
-    # Find all CSV and Parquet files, excluding common directories to avoid
+    # Find all CSV and Parquet files, excluding common directories
     excluded_dirs = {
         ".venv",
-        "venv",
+        "venv", 
         "__pycache__",
         ".git",
         "node_modules",
@@ -63,74 +57,252 @@ def scan(
             data_files.append(file_path)
 
     if not data_files:
-        console.print(f"[yellow]No CSV or Parquet files found in {path}[/yellow]")
+        console.print(f"[yellow]No CSV or Parquet files found in {directory}[/yellow]")
         return
 
-    console.print(f"Found {len(data_files)} dataset(s)")
+    console.print(f"Found {len(data_files)} local file(s)")
 
     # Load or create manifest
-    manifest = Manifest()
+    manifest = Manifest(manifest_path)
     manifest.load()
 
-    # Process each file
+    # Process each file (discovery only, no schema generation)
     for file_path in data_files:
         try:
             relative_path = str(file_path.relative_to(Path.cwd()))
         except ValueError:
             # If file is not relative to cwd, use absolute path
             relative_path = str(file_path)
+        
         console.print(f"Processing: {relative_path}")
 
         try:
             # Compute file hash
             crc32_hash = compute_file_crc32(file_path)
 
-            # Scaffold schema
-            schema, schema_file = scaffold_dataset_schema(
-                file_path, overwrite=overwrite_schemas
-            )
-
-            # Compute schema hash
-            schema_md5 = compute_schema_md5(schema)
-
             # Check if file changed
             existing_entry = manifest.get_dataset(relative_path)
             if existing_entry:
-                if (
-                    existing_entry["crc32"] != crc32_hash
-                    or existing_entry["schema_md5"] != schema_md5
-                ):
-                    # File or schema changed, mark as unsigned
+                current_hash = manifest.get_content_hash(relative_path)
+                if current_hash != crc32_hash:
+                    # File changed, update entry and mark as unscaffolded
                     manifest.add_dataset(
-                        relative_path, crc32_hash, schema_md5, signed=False
+                        relative_path, 
+                        "local_file", 
+                        crc32_hash, 
+                        signed=False,
+                        scaffolded=False
                     )
-                    console.print(
-                        f"  [yellow]Updated (unsigned due to changes)[/yellow]"
-                    )
+                    console.print(f"  [yellow]Updated (file changed)[/yellow]")
                 else:
                     console.print(f"  [green]No changes[/green]")
             else:
                 # New file
                 manifest.add_dataset(
-                    relative_path, crc32_hash, schema_md5, signed=False
+                    relative_path, 
+                    "local_file", 
+                    crc32_hash, 
+                    signed=False,
+                    scaffolded=False
                 )
-                console.print(f"  [blue]Added (unsigned)[/blue]")
-
-            if schema_file:
-                console.print(f"  Schema: {schema_file}")
+                console.print(f"  [blue]Added (not scaffolded)[/blue]")
 
         except Exception as e:
             console.print(f"  [red]Error: {e}[/red]")
 
     # Save manifest
     manifest.save()
-    console.print(f"[green]Manifest updated: manifest.json[/green]")
+    console.print(f"[green]Manifest updated: {manifest_path}[/green]")
+
+
+def _scan_remote_dataset(dataset_name: str, manifest_path: str) -> None:
+    """Scan remote HuggingFace dataset and add to manifest."""
+    try:
+        from .dataset_utils import compute_dataset_hash, extract_dataset_metadata
+        from datasets import load_dataset
+    except ImportError:
+        console.print("[red]Error: datasets library required for remote datasets[/red]")
+        console.print("Install with: pip install datasets")
+        sys.exit(1)
+
+    console.print(f"Loading remote dataset: {dataset_name}")
+    
+    try:
+        # Load dataset to get metadata
+        dataset = load_dataset(dataset_name)
+        
+        # Extract metadata and compute hash
+        metadata = extract_dataset_metadata(dataset)
+        dataset_hash = compute_dataset_hash(dataset)
+        
+        console.print(f"Dataset type: {metadata['dataset_type']}")
+        console.print(f"Available keys: {metadata['available_keys']}")
+        console.print(f"Total records: {metadata['total_size']}")
+        
+        # Load or create manifest
+        manifest = Manifest(manifest_path)
+        manifest.load()
+        
+        # Check if dataset changed
+        existing_entry = manifest.get_dataset(dataset_name)
+        if existing_entry:
+            current_hash = manifest.get_content_hash(dataset_name)
+            if current_hash != dataset_hash:
+                # Dataset changed, update entry
+                manifest.add_dataset(
+                    dataset_name,
+                    "remote_dataset",
+                    dataset_hash,
+                    signed=False,
+                    scaffolded=False,
+                    dataset_name=dataset_name
+                )
+                console.print(f"  [yellow]Updated (dataset changed)[/yellow]")
+            else:
+                console.print(f"  [green]No changes[/green]")
+        else:
+            # New dataset
+            manifest.add_dataset(
+                dataset_name,
+                "remote_dataset", 
+                dataset_hash,
+                signed=False,
+                scaffolded=False,
+                dataset_name=dataset_name
+            )
+            console.print(f"  [blue]Added (not scaffolded)[/blue]")
+        
+        # Save manifest
+        manifest.save()
+        console.print(f"[green]Manifest updated: {manifest_path}[/green]")
+        
+    except Exception as e:
+        console.print(f"[red]Error loading dataset: {e}[/red]")
+        sys.exit(1)
 
 
 @app.command()
-def sign():
+def scan(
+    source: str = typer.Argument(..., help="Directory to scan for local files or remote dataset name"),
+    manifest_path: str = typer.Option("manifest.json", "--manifest", help="Path to manifest file"),
+    remote: bool = typer.Option(False, "--remote", help="Scan remote dataset instead of local directory"),
+):
+    """Scan for data sources and add to manifest (no schema generation)."""
+    if remote:
+        # Handle remote dataset scanning
+        console.print(f"Scanning remote dataset: {source}")
+        _scan_remote_dataset(source, manifest_path)
+    else:
+        # Handle local directory scanning
+        console.print(f"Scanning local directory: {source}")
+        _scan_local_directory(source, manifest_path)
+
+
+@app.command()
+def scaffold(
+    manifest_path: str = typer.Option("manifest.json", "--manifest", help="Path to manifest file"),
+    overwrite_schemas: bool = typer.Option(False, "--overwrite", help="Regenerate existing schemas"),
+):
+    """Generate schemas for datasets in manifest."""
+    manifest = Manifest(manifest_path)
+    manifest.load()
+
+    datasets = manifest.get_all_datasets()
+    if not datasets:
+        console.print("[yellow]No datasets found in manifest[/yellow]")
+        console.print("Run 'fosho scan' first to discover datasets")
+        return
+
+    console.print(f"Scaffolding schemas for {len(datasets)} dataset(s)...")
+
+    for identifier, dataset_info in datasets.items():
+        source_type = dataset_info.get("source_type")
+        
+        # Skip if already scaffolded unless overwrite requested
+        if dataset_info.get("scaffolded", False) and not overwrite_schemas:
+            console.print(f"  [green]✓ {identifier} (already scaffolded)[/green]")
+            continue
+
+        console.print(f"  Scaffolding: {identifier}")
+
+        try:
+            if source_type == "local_file":
+                _scaffold_local_file(identifier, dataset_info, manifest)
+            elif source_type == "remote_dataset":
+                _scaffold_remote_dataset(identifier, dataset_info, manifest)
+            else:
+                console.print(f"    [red]Unknown source type: {source_type}[/red]")
+                continue
+
+        except Exception as e:
+            console.print(f"    [red]Error: {e}[/red]")
+
+    # Save manifest
+    manifest.save()
+    console.print(f"[green]Schema generation complete. Manifest updated: {manifest_path}[/green]")
+
+
+def _scaffold_local_file(file_path: str, dataset_info: dict, manifest: Manifest) -> None:
+    """Generate schema for a local file."""
+    file_obj = Path(file_path)
+    if not file_obj.exists():
+        raise FileNotFoundError(f"File not found: {file_path}")
+
+    # Generate schema using existing scaffold functionality
+    schema, schema_file = scaffold_dataset_schema(file_obj, overwrite=True)
+    
+    # Compute schema hash
+    schema_md5 = compute_schema_md5(schema)
+    
+    # Update manifest
+    manifest.scaffold_dataset(file_path, schema_md5, str(schema_file))
+    
+    console.print(f"    [blue]Generated: {schema_file}[/blue]")
+
+
+def _scaffold_remote_dataset(dataset_name: str, dataset_info: dict, manifest: Manifest) -> None:
+    """Generate schema for a remote dataset."""
+    try:
+        from .dataset_schema import generate_dataset_schema_file
+        from .hashing import compute_schema_md5
+        from datasets import load_dataset
+    except ImportError:
+        raise ImportError("datasets library required for remote datasets")
+
+    # Load dataset
+    dataset = load_dataset(dataset_name)
+    
+    # Generate schema file
+    schema_file = generate_dataset_schema_file(
+        dataset, 
+        dataset_name.replace("/", "_"), 
+        output_dir="schemas"
+    )
+    
+    # Load and hash the generated schema
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("schema_module", schema_file)
+    schema_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(schema_module)
+    schema = schema_module.schema
+    
+    # For dataset schemas, we hash the schema file content itself
+    with open(schema_file, 'r') as f:
+        schema_content = f.read()
+    schema_md5 = compute_schema_md5(schema_content)
+    
+    # Update manifest
+    manifest.scaffold_dataset(dataset_name, schema_md5, str(schema_file))
+    
+    console.print(f"    [blue]Generated: {schema_file}[/blue]")
+
+
+@app.command()
+def sign(
+    manifest_path: str = typer.Option("manifest.json", "--manifest", help="Path to manifest file"),
+):
     """Sign all datasets in manifest (mark as approved)."""
-    manifest = Manifest()
+    manifest = Manifest(manifest_path)
     manifest.load()
 
     datasets = manifest.get_all_datasets()
@@ -201,6 +373,7 @@ def sign():
 
 @app.command()
 def status(
+    manifest_path: str = typer.Option("manifest.json", "--manifest", help="Path to manifest file"),
     json_output: bool = typer.Option(False, "--json", help="Output status as JSON for machine parsing")
 ):
     """Show status of all datasets with file, data, and schema verification.\n\n
@@ -215,7 +388,7 @@ def status(
     # - Schema Path: The path to the corresponding schema file \n\n
     # - Signed At: The date and time the dataset was signed
     """
-    manifest = Manifest()
+    manifest = Manifest(manifest_path)
     manifest.load()
 
     datasets = manifest.get_all_datasets()
@@ -234,9 +407,10 @@ def status(
 
         table = Table()
         table.add_column("Dataset", style="cyan")
-        table.add_column("CRC32", style="magenta")
+        table.add_column("Source Type", style="yellow")
+        table.add_column("Content Hash", style="magenta")
+        table.add_column("Scaffolded", style="blue")
         table.add_column("Status", style="green")
-        table.add_column("File Status")
         table.add_column("Data Status")
         table.add_column("Schema Status")
         table.add_column("Schema Path", style="blue")

@@ -1,0 +1,14 @@
+{
+  "datasets": {
+    "examples/eg2/data/text_example.csv": {
+      "crc32": "f9cb9b27",
+      "scaffolded": true,
+      "schema_md5": "b96f9ef9b25b9dd9ccf48d885f03b048",
+      "schema_path": "schemas/text_example_schema.py",
+      "signed": true,
+      "signed_at": "2025-07-26T20:52:17.939230Z",
+      "source_type": "local_file"
+    }
+  },
+  "manifest_md5": "4112df60a47abecad3a82caed8a5be05"
+}

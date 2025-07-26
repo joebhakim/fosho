@@ -1,0 +1,10 @@
+[
+  {
+    "chosen": "\n\nHuman: How do I make a peanut butter sandwich?\n\nAssistant: Here's how to make a peanut butter sandwich:\n\n1. Get two slices of bread\n2. Spread peanut butter on one slice\n3. Optionally add jelly or other ingredients\n4. Put the slices together\n\nEnjoy your sandwich!",
+    "rejected": "\n\nHuman: How do I make a peanut butter sandwich?\n\nAssistant: Just put peanut butter on bread. Done."
+  },
+  {
+    "chosen": "\n\nHuman: What's the weather like?\n\nAssistant: I don't have access to real-time weather data. You can check the weather by looking outside, using a weather app, or visiting a weather website like weather.com.",
+    "rejected": "\n\nHuman: What's the weather like?\n\nAssistant: It's sunny everywhere all the time."
+  }
+]

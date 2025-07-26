@@ -1,0 +1,18 @@
+[
+  {
+    "chosen": "\n\nHuman: How do I make a peanut butter sandwich?\n\nAssistant: Here's how to make a peanut butter sandwich:\n\n1. Get two slices of bread\n2. Spread peanut butter on one slice\n3. Optionally add jelly or other ingredients\n4. Put the slices together\n\nEnjoy your sandwich!",
+    "rejected": "\n\nHuman: How do I make a peanut butter sandwich?\n\nAssistant: Just put peanut butter on bread. Done."
+  },
+  {
+    "chosen": "\n\nHuman: What's the weather like?\n\nAssistant: I don't have access to real-time weather data. You can check the weather by looking outside, using a weather app, or visiting a weather website like weather.com.",
+    "rejected": "\n\nHuman: What's the weather like?\n\nAssistant: It's sunny everywhere all the time."
+  },
+  {
+    "chosen": "\n\nHuman: How do I learn Python programming?\n\nAssistant: Here are some great ways to learn Python:\n\n1. Start with official Python tutorial\n2. Try interactive platforms like Codecademy or Python.org\n3. Practice with small projects\n4. Read books like 'Automate the Boring Stuff'\n5. Join Python communities\n\nConsistent practice is key!",
+    "rejected": "\n\nHuman: How do I learn Python programming?\n\nAssistant: Python is hard, just give up."
+  },
+  {
+    "chosen": "\n\nHuman: What are the benefits of exercise?\n\nAssistant: Regular exercise provides many benefits:\n\n1. Improves cardiovascular health\n2. Strengthens muscles and bones\n3. Enhances mental health and mood\n4. Helps maintain healthy weight\n5. Boosts energy levels\n6. Improves sleep quality\n\nAim for at least 150 minutes of moderate activity per week.",
+    "rejected": "\n\nHuman: What are the benefits of exercise?\n\nAssistant: Exercise is overrated. Just stay on the couch."
+  }
+]

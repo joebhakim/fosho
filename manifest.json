@@ -25,11 +25,11 @@
       "signed_at": "2025-07-24T19:41:43.976820Z"
     },
     "examples/eg2/data/text_example.csv": {
-      "crc32": "c34af232",
+      "crc32": "f9cb9b27",
       "schema_md5": "b96f9ef9b25b9dd9ccf48d885f03b048",
-      "signed": true,
-      "signed_at": "2025-07-24T19:41:43.976822Z"
+      "signed": false,
+      "signed_at": null
     }
   },
-  "manifest_md5": "ebe062ec08ef2deba0bf91daefbc8016"
+  "manifest_md5": "698beac5b816653d60451e2271bc0d48"
 }
